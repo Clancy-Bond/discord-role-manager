@@ -7,7 +7,7 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
 });
 
-// Load commands
+// Load slash commands
 client.commands = new Collection();
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(f => f.endsWith('.js'));
@@ -41,8 +41,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 client.once(Events.ClientReady, (c) => {
-  console.log(`Role Manager online as ${c.user.tag}`);
+  console.log(`Bot online as ${c.user.tag}`);
   console.log(`In ${c.guilds.cache.size} server(s)`);
+
+  // Start web dashboard after bot is ready
+  const startServer = require('./server');
+  startServer(client);
 });
 
 client.login(process.env.DISCORD_TOKEN);

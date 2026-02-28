@@ -1,9 +1,9 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, PermissionsBitField, REST, Routes } = require('discord.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('duplicate-role')
-    .setDescription('Duplicate an existing role with all its permissions, color, and settings')
+    .setDescription('Duplicate a role with all permissions, channel overrides, color, and settings')
     .addRoleOption(option =>
       option
         .setName('role')
@@ -40,7 +40,6 @@ module.exports = {
     const count = interaction.options.getInteger('count') || 1;
     const copyMembers = interaction.options.getBoolean('copy-members') || false;
 
-    // Safety: can't duplicate @everyone or roles above the bot's highest role
     if (sourceRole.id === interaction.guild.id) {
       return interaction.editReply('Cannot duplicate the @everyone role.');
     }
@@ -53,6 +52,7 @@ module.exports = {
     }
 
     const created = [];
+    const errors = [];
     try {
       for (let i = 0; i < count; i++) {
         let roleName;
@@ -71,23 +71,58 @@ module.exports = {
           reason: `Role duplicated from "${sourceRole.name}" by ${interaction.user.tag}`,
         });
 
-        // Try to position it right below the source role
         try {
           await newRole.setPosition(sourceRole.position - 1);
-        } catch {
-          // Position setting can fail due to hierarchy - not critical
-        }
+        } catch {}
 
-        // Copy role icon if the guild supports it and the role has one
         if (sourceRole.icon && interaction.guild.premiumTier >= 2) {
           try {
             await newRole.setIcon(sourceRole.iconURL());
-          } catch {
-            // Icon copy can fail - not critical
-          }
+          } catch {}
         }
 
         created.push(newRole);
+      }
+
+      // ── Copy channel permission overrides using REST API directly ──
+      // This bypasses discord.js caching issues by hitting Discord's API
+      const rest = new REST().setToken(process.env.DISCORD_TOKEN);
+      let channelsCopied = 0;
+      let channelsFailed = 0;
+
+      // Fetch ALL channels fresh from the API (not cache)
+      const apiChannels = await rest.get(Routes.guildChannels(interaction.guild.id));
+      console.log(`Found ${apiChannels.length} channels in guild via API`);
+
+      for (const apiChannel of apiChannels) {
+        // Find overwrite for source role in this channel
+        const overwrites = apiChannel.permission_overwrites || [];
+        const sourceOverwrite = overwrites.find(ow => ow.id === sourceRole.id);
+        if (!sourceOverwrite) continue;
+
+        console.log(`Channel #${apiChannel.name}: found override for source role - allow: ${sourceOverwrite.allow}, deny: ${sourceOverwrite.deny}`);
+
+        for (const newRole of created) {
+          try {
+            // PUT the permission overwrite directly via REST
+            await rest.put(
+              `/channels/${apiChannel.id}/permissions/${newRole.id}`,
+              {
+                body: {
+                  type: 0, // 0 = role, 1 = member
+                  allow: sourceOverwrite.allow,
+                  deny: sourceOverwrite.deny,
+                },
+              }
+            );
+            console.log(`  -> Applied to ${newRole.name} on #${apiChannel.name}`);
+          } catch (err) {
+            console.error(`  -> FAILED for ${newRole.name} on #${apiChannel.name}: ${err.message}`);
+            errors.push(`#${apiChannel.name}: ${err.message}`);
+            channelsFailed++;
+          }
+        }
+        channelsCopied++;
       }
 
       // Copy members if requested
@@ -102,9 +137,7 @@ module.exports = {
               await member.roles.add(role);
             }
             memberCount++;
-          } catch {
-            // Some members might not be assignable
-          }
+          } catch {}
         }
       }
 
@@ -114,12 +147,22 @@ module.exports = {
       let response = `**Duplicated** ${sourceRole.name}\n\n`;
       response += `**Created ${created.length} role(s):**\n${roleList}\n\n`;
       response += `**Copied:** color \`#${sourceRole.color.toString(16).padStart(6, '0')}\`, `;
-      response += `${permCount} permissions, `;
+      response += `${permCount} server permissions, `;
+      response += `${channelsCopied} channel override(s), `;
       response += `hoist: ${sourceRole.hoist ? 'yes' : 'no'}, `;
       response += `mentionable: ${sourceRole.mentionable ? 'yes' : 'no'}`;
 
+      if (channelsFailed > 0) {
+        response += `\n**Failed:** ${channelsFailed} channel(s) - check bot permissions`;
+      }
+
       if (copyMembers) {
         response += `\n**Assigned to:** ${memberCount} member(s)`;
+      }
+
+      if (errors.length > 0) {
+        response += `\n\n**Errors:**\n${errors.slice(0, 5).map(e => `- ${e}`).join('\n')}`;
+        if (errors.length > 5) response += `\n- ...and ${errors.length - 5} more`;
       }
 
       return interaction.editReply(response);

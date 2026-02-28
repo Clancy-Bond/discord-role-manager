@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Role Manager</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0e0e10;
+      --surface: #1a1a2e;
+      --surface-hover: #222240;
+      --border: #2a2a45;
+      --text: #e0e0e8;
+      --text-muted: #8888a0;
+      --accent: #5865f2;
+      --accent-hover: #4752c4;
+      --green: #57f287;
+      --red: #ed4245;
+      --yellow: #fee75c;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Login Screen ── */
+    .login-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 24px;
+    }
+    .login-screen h1 { font-size: 32px; font-weight: 700; }
+    .login-screen p { color: var(--text-muted); font-size: 16px; }
+    .btn-login {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 14px 32px; background: var(--accent); color: white;
+      border: none; border-radius: 8px; font-size: 16px; font-weight: 600;
+      cursor: pointer; text-decoration: none; transition: background 0.2s;
+    }
+    .btn-login:hover { background: var(--accent-hover); }
+
+    /* ── Top Bar ── */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 32px; border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .topbar-left { display: flex; align-items: center; gap: 16px; }
+    .topbar h1 { font-size: 20px; font-weight: 700; }
+    .topbar-user { display: flex; align-items: center; gap: 12px; }
+    .topbar-user img { width: 32px; height: 32px; border-radius: 50%; }
+    .btn-logout {
+      padding: 6px 16px; background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border); border-radius: 6px; font-size: 13px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-logout:hover { border-color: var(--red); color: var(--red); }
+
+    /* ── Server Picker ── */
+    .server-picker {
+      display: flex; align-items: center; gap: 8px; padding: 0 32px; margin-top: 20px;
+    }
+    .server-picker label { color: var(--text-muted); font-size: 14px; font-weight: 500; }
+    .server-picker select {
+      padding: 8px 14px; background: var(--surface); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px; font-size: 14px;
+      cursor: pointer; min-width: 200px;
+    }
+
+    /* ── Stats Bar ── */
+    .stats {
+      display: flex; gap: 16px; padding: 16px 32px;
+    }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px 24px; min-width: 140px;
+    }
+    .stat-card .value { font-size: 28px; font-weight: 700; }
+    .stat-card .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-top: 4px; }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex; align-items: center; gap: 12px; padding: 8px 32px;
+    }
+    .search-input {
+      flex: 1; max-width: 300px; padding: 10px 16px;
+      background: var(--surface); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px; font-size: 14px;
+      outline: none; transition: border-color 0.2s;
+    }
+    .search-input:focus { border-color: var(--accent); }
+    .search-input::placeholder { color: var(--text-muted); }
+
+    /* ── Roles Grid ── */
+    .roles-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 12px; padding: 8px 32px 32px;
+    }
+    .role-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px; cursor: pointer;
+      transition: all 0.2s; position: relative;
+    }
+    .role-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .role-card.managed { opacity: 0.5; }
+    .role-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .role-color {
+      width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.1);
+      flex-shrink: 0;
+    }
+    .role-name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .role-meta { display: flex; gap: 12px; flex-wrap: wrap; }
+    .role-meta span { font-size: 12px; color: var(--text-muted); }
+    .role-actions {
+      display: flex; gap: 6px; position: absolute; top: 12px; right: 12px; opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .role-card:hover .role-actions { opacity: 1; }
+    .btn-icon {
+      width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--text-muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; transition: all 0.2s;
+    }
+    .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-icon.danger:hover { border-color: var(--red); color: var(--red); }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 600; background: rgba(88, 101, 242, 0.15);
+      color: var(--accent);
+    }
+    .badge.hoist { background: rgba(87, 242, 135, 0.15); color: var(--green); }
+    .badge.mentionable { background: rgba(254, 231, 92, 0.15); color: var(--yellow); }
+    .badge.managed { background: rgba(237, 66, 69, 0.15); color: var(--red); }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      z-index: 1000; align-items: center; justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 28px; width: 440px; max-width: 90vw;
+      max-height: 80vh; overflow-y: auto;
+    }
+    .modal h2 { font-size: 20px; margin-bottom: 20px; }
+    .modal label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500; }
+    .modal input[type="text"], .modal input[type="number"], .modal input[type="color"] {
+      width: 100%; padding: 10px 14px; background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px; font-size: 14px;
+      margin-bottom: 14px; outline: none;
+    }
+    .modal input[type="color"] { height: 42px; cursor: pointer; padding: 4px; }
+    .modal input:focus { border-color: var(--accent); }
+    .checkbox-row {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
+    }
+    .checkbox-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+    .checkbox-row label { margin-bottom: 0; cursor: pointer; color: var(--text); }
+    .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    .btn {
+      padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600;
+      cursor: pointer; border: none; transition: all 0.2s;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-cancel { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+    .btn-cancel:hover { border-color: var(--text-muted); }
+
+    /* ── Permissions List ── */
+    .perms-list {
+      display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; margin-bottom: 14px;
+      max-height: 150px; overflow-y: auto; padding: 8px; background: var(--bg);
+      border-radius: 8px; border: 1px solid var(--border);
+    }
+    .perm-tag {
+      padding: 3px 8px; background: rgba(88,101,242,0.1); border-radius: 4px;
+      font-size: 11px; color: var(--accent);
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; padding: 14px 24px;
+      background: var(--green); color: #000; border-radius: 8px;
+      font-weight: 600; font-size: 14px; z-index: 2000;
+      transform: translateY(100px); opacity: 0; transition: all 0.3s;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.error { background: var(--red); color: white; }
+
+    /* ── Loading ── */
+    .loading { text-align: center; padding: 60px; color: var(--text-muted); font-size: 16px; }
+
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Login Screen -->
+  <div id="login-screen" class="login-screen hidden">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#5865f2" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+    <h1>Role Manager</h1>
+    <p>Manage your Discord server roles from a clean dashboard.</p>
+    <a href="/auth/login" class="btn-login">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+      Login with Discord
+    </a>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="hidden">
+    <div class="topbar">
+      <div class="topbar-left">
+        <h1>Role Manager</h1>
+      </div>
+      <div class="topbar-user">
+        <img id="user-avatar" src="" alt="">
+        <span id="user-name"></span>
+        <button class="btn-logout" onclick="location.href='/auth/logout'">Logout</button>
+      </div>
+    </div>
+
+    <div class="server-picker">
+      <label>Server:</label>
+      <select id="guild-select" onchange="loadRoles()"></select>
+    </div>
+
+    <div class="stats" id="stats-bar"></div>
+
+    <div class="toolbar">
+      <input type="text" class="search-input" id="search" placeholder="Search roles..." oninput="filterRoles()">
+    </div>
+
+    <div class="roles-grid" id="roles-grid"></div>
+  </div>
+
+  <!-- Duplicate Modal -->
+  <div class="modal-overlay" id="duplicate-modal">
+    <div class="modal">
+      <h2>Duplicate Role</h2>
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:18px;">
+        Duplicating: <strong id="dup-source-name"></strong>
+      </p>
+      <label>New Role Name</label>
+      <input type="text" id="dup-name" placeholder="Copy of ...">
+      <label>Number of Copies</label>
+      <input type="number" id="dup-count" value="1" min="1" max="10">
+      <div class="checkbox-row">
+        <input type="checkbox" id="dup-copy-members">
+        <label for="dup-copy-members">Also copy member assignments</label>
+      </div>
+      <div class="modal-buttons">
+        <button class="btn btn-cancel" onclick="closeModal('duplicate-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="executeDuplicate()">Duplicate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info Modal -->
+  <div class="modal-overlay" id="info-modal">
+    <div class="modal">
+      <h2 id="info-role-name">Role Info</h2>
+      <div id="info-content"></div>
+      <div class="modal-buttons">
+        <button class="btn btn-cancel" onclick="closeModal('info-modal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let allRoles = [];
+    let currentGuildId = null;
+    let duplicateRoleId = null;
+
+    // ── Sanitization helper - prevents XSS ──
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // Safe DOM builder - creates elements without innerHTML for user-controlled data
+    function createEl(tag, attrs = {}, children = []) {
+      const el = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === 'className') el.className = v;
+        else if (k === 'textContent') el.textContent = v;
+        else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+        else if (k === 'onclick') el.addEventListener('click', v);
+        else el.setAttribute(k, v);
+      }
+      children.forEach(c => {
+        if (typeof c === 'string') el.appendChild(document.createTextNode(c));
+        else if (c) el.appendChild(c);
+      });
+      return el;
+    }
+
+    // ── Init ──
+    async function init() {
+      const res = await fetch('/api/me');
+      const data = await res.json();
+
+      if (!data.authenticated) {
+        document.getElementById('login-screen').classList.remove('hidden');
+        return;
+      }
+
+      document.getElementById('dashboard').classList.remove('hidden');
+      document.getElementById('user-name').textContent = data.user.username;
+      if (data.user.avatar) {
+        document.getElementById('user-avatar').src =
+          `https://cdn.discordapp.com/avatars/${data.user.id}/${data.user.avatar}.png?size=64`;
+      }
+
+      const guildsRes = await fetch('/api/guilds');
+      const guilds = await guildsRes.json();
+      const select = document.getElementById('guild-select');
+      guilds.forEach((g) => {
+        const opt = document.createElement('option');
+        opt.value = g.id;
+        opt.textContent = g.name;
+        select.appendChild(opt);
+      });
+
+      if (guilds.length > 0) {
+        currentGuildId = guilds[0].id;
+        loadRoles();
+      }
+    }
+
+    // ── Load Roles ──
+    async function loadRoles() {
+      currentGuildId = document.getElementById('guild-select').value;
+      const grid = document.getElementById('roles-grid');
+      grid.textContent = '';
+      grid.appendChild(createEl('div', { className: 'loading', textContent: 'Loading roles...' }));
+
+      try {
+        const res = await fetch(`/api/guilds/${currentGuildId}/roles`);
+        allRoles = await res.json();
+        renderStats();
+        renderRoles(allRoles);
+      } catch (err) {
+        grid.textContent = '';
+        grid.appendChild(createEl('div', { className: 'loading', textContent: 'Failed to load roles' }));
+      }
+    }
+
+    // ── Render Stats (safe - only uses numeric data) ──
+    function renderStats() {
+      const bar = document.getElementById('stats-bar');
+      bar.textContent = '';
+      const hoisted = allRoles.filter((r) => r.hoist).length;
+      const managed = allRoles.filter((r) => r.managed).length;
+      const totalMembers = allRoles.reduce((sum, r) => sum + r.memberCount, 0);
+
+      const stats = [
+        { value: allRoles.length, label: 'Total Roles' },
+        { value: hoisted, label: 'Hoisted' },
+        { value: managed, label: 'Bot / Managed' },
+        { value: totalMembers, label: 'Total Assignments' },
+      ];
+
+      stats.forEach(s => {
+        bar.appendChild(createEl('div', { className: 'stat-card' }, [
+          createEl('div', { className: 'value', textContent: String(s.value) }),
+          createEl('div', { className: 'label', textContent: s.label }),
+        ]));
+      });
+    }
+
+    // ── Render Roles (safe DOM construction) ──
+    function renderRoles(roles) {
+      const grid = document.getElementById('roles-grid');
+      grid.textContent = '';
+
+      if (roles.length === 0) {
+        grid.appendChild(createEl('div', { className: 'loading', textContent: 'No roles found' }));
+        return;
+      }
+
+      roles.forEach(r => {
+        const card = createEl('div', {
+          className: `role-card ${r.managed ? 'managed' : ''}`,
+          'data-id': r.id,
+        });
+
+        // Action buttons
+        const actions = createEl('div', { className: 'role-actions' });
+
+        const dupBtn = createEl('button', { className: 'btn-icon', title: 'Duplicate', textContent: '\u2398' });
+        dupBtn.addEventListener('click', (e) => { e.stopPropagation(); openDuplicate(r.id); });
+        actions.appendChild(dupBtn);
+
+        const infoBtn = createEl('button', { className: 'btn-icon', title: 'Info', textContent: 'i' });
+        infoBtn.addEventListener('click', (e) => { e.stopPropagation(); showInfo(r.id); });
+        actions.appendChild(infoBtn);
+
+        if (!r.managed) {
+          const delBtn = createEl('button', { className: 'btn-icon danger', title: 'Delete', textContent: '\u00d7' });
+          delBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteRole(r.id, r.name); });
+          actions.appendChild(delBtn);
+        }
+        card.appendChild(actions);
+
+        // Header (color dot + name)
+        const header = createEl('div', { className: 'role-header' });
+        const colorDot = createEl('div', { className: 'role-color' });
+        colorDot.style.background = r.color || '#444';
+        header.appendChild(colorDot);
+        header.appendChild(createEl('span', { className: 'role-name', textContent: r.name }));
+        card.appendChild(header);
+
+        // Meta row
+        const meta = createEl('div', { className: 'role-meta' });
+        meta.appendChild(createEl('span', { textContent: `${r.memberCount} member${r.memberCount !== 1 ? 's' : ''}` }));
+        meta.appendChild(createEl('span', { textContent: r.color || 'No color' }));
+        meta.appendChild(createEl('span', { textContent: `Pos: ${r.position}` }));
+        if (r.hoist) meta.appendChild(createEl('span', { className: 'badge hoist', textContent: 'Hoisted' }));
+        if (r.mentionable) meta.appendChild(createEl('span', { className: 'badge mentionable', textContent: 'Mentionable' }));
+        if (r.managed) meta.appendChild(createEl('span', { className: 'badge managed', textContent: 'Managed' }));
+        card.appendChild(meta);
+
+        grid.appendChild(card);
+      });
+    }
+
+    // ── Search Filter ──
+    function filterRoles() {
+      const q = document.getElementById('search').value.toLowerCase();
+      const filtered = allRoles.filter((r) => r.name.toLowerCase().includes(q));
+      renderRoles(filtered);
+    }
+
+    // ── Duplicate Modal ──
+    function openDuplicate(roleId) {
+      duplicateRoleId = roleId;
+      const role = allRoles.find((r) => r.id === roleId);
+      document.getElementById('dup-source-name').textContent = role.name;
+      document.getElementById('dup-name').value = '';
+      document.getElementById('dup-name').placeholder = `Copy of ${role.name}`;
+      document.getElementById('dup-count').value = 1;
+      document.getElementById('dup-copy-members').checked = false;
+      document.getElementById('duplicate-modal').classList.add('active');
+    }
+
+    async function executeDuplicate() {
+      const name = document.getElementById('dup-name').value || undefined;
+      const count = parseInt(document.getElementById('dup-count').value) || 1;
+      const copyMembers = document.getElementById('dup-copy-members').checked;
+
+      try {
+        const res = await fetch(`/api/guilds/${currentGuildId}/roles/${duplicateRoleId}/duplicate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, count, copyMembers }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`Created ${data.created.length} role(s)${data.membersCopied ? ` and assigned to ${data.membersCopied} members` : ''}`);
+          closeModal('duplicate-modal');
+          loadRoles();
+        } else {
+          showToast(data.error || 'Failed to duplicate', true);
+        }
+      } catch {
+        showToast('Failed to duplicate role', true);
+      }
+    }
+
+    // ── Role Info Modal (safe DOM construction) ──
+    function showInfo(roleId) {
+      const role = allRoles.find((r) => r.id === roleId);
+      document.getElementById('info-role-name').textContent = role.name;
+
+      const content = document.getElementById('info-content');
+      content.textContent = '';
+
+      // Info grid
+      const grid = createEl('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' } });
+
+      const fields = [
+        { label: 'ID', value: role.id },
+        { label: 'Color', value: role.color || 'None' },
+        { label: 'Members', value: String(role.memberCount) },
+        { label: 'Position', value: String(role.position) },
+        { label: 'Hoisted', value: role.hoist ? 'Yes' : 'No' },
+        { label: 'Mentionable', value: role.mentionable ? 'Yes' : 'No' },
+        { label: 'Managed', value: role.managed ? 'Yes' : 'No' },
+        { label: 'Created', value: new Date(role.createdAt).toLocaleDateString() },
+      ];
+
+      fields.forEach(f => {
+        const cell = createEl('div');
+        cell.appendChild(createEl('span', { style: { color: 'var(--text-muted)', fontSize: '12px' }, textContent: f.label }));
+        cell.appendChild(document.createElement('br'));
+
+        if (f.label === 'Color' && role.color) {
+          const colorWrap = createEl('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '6px' } });
+          const dot = createEl('span', { className: 'role-color', style: { background: role.color, width: '14px', height: '14px', display: 'inline-block', borderRadius: '50%' } });
+          colorWrap.appendChild(dot);
+          colorWrap.appendChild(document.createTextNode(f.value));
+          cell.appendChild(colorWrap);
+        } else if (f.label === 'ID') {
+          cell.appendChild(createEl('code', { style: { fontSize: '13px' }, textContent: f.value }));
+        } else {
+          cell.appendChild(document.createTextNode(f.value));
+        }
+        grid.appendChild(cell);
+      });
+
+      content.appendChild(grid);
+
+      // Permissions
+      content.appendChild(createEl('label', { textContent: `Permissions (${role.permissions.length})` }));
+      const permsList = createEl('div', { className: 'perms-list' });
+      if (role.permissions.length > 0) {
+        role.permissions.forEach(p => {
+          permsList.appendChild(createEl('span', { className: 'perm-tag', textContent: p.replace(/([A-Z])/g, ' $1').trim() }));
+        });
+      } else {
+        permsList.appendChild(createEl('span', { style: { color: 'var(--text-muted)' }, textContent: 'No permissions' }));
+      }
+      content.appendChild(permsList);
+
+      document.getElementById('info-modal').classList.add('active');
+    }
+
+    // ── Delete Role ──
+    async function deleteRole(roleId, roleName) {
+      if (!confirm(`Delete role "${roleName}"? This cannot be undone.`)) return;
+
+      try {
+        const res = await fetch(`/api/guilds/${currentGuildId}/roles/${roleId}`, { method: 'DELETE' });
+        if (res.ok) {
+          showToast(`Deleted "${roleName}"`);
+          loadRoles();
+        } else {
+          const data = await res.json();
+          showToast(data.error || 'Failed to delete', true);
+        }
+      } catch {
+        showToast('Failed to delete role', true);
+      }
+    }
+
+    // ── Helpers ──
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+
+    function showToast(msg, isError = false) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.className = `toast show ${isError ? 'error' : ''}`;
+      setTimeout(() => toast.className = 'toast', 3000);
+    }
+
+    // Close modals on overlay click
+    document.querySelectorAll('.modal-overlay').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        if (e.target === el) el.classList.remove('active');
+      });
+    });
+
+    init();
+  </script>
+</body>
+</html>
