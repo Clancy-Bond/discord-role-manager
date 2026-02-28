@@ -1,0 +1,22 @@
+{
+  "name": "discord-role-manager",
+  "version": "1.0.0",
+  "description": "Discord bot for role management - duplicate roles, bulk assign, and more",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy": "node src/deploy-commands.js",
+    "dev": "node --watch src/index.js"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "roles"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.25.1",
+    "dotenv": "^17.3.1"
+  }
+}
