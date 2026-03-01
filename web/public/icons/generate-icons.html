@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<body>
+<canvas id="c" width="512" height="512"></canvas>
+<script>
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+// Background
+ctx.fillStyle = '#5865f2';
+ctx.beginPath();
+ctx.roundRect(0, 0, 512, 512, 64);
+ctx.fill();
+// Shield
+ctx.strokeStyle = 'white';
+ctx.lineWidth = 16;
+ctx.beginPath();
+ctx.moveTo(256, 88);
+ctx.lineTo(384, 136);
+ctx.lineTo(384, 256);
+ctx.quadraticCurveTo(384, 384, 256, 424);
+ctx.quadraticCurveTo(128, 384, 128, 256);
+ctx.lineTo(128, 136);
+ctx.closeTo();
+ctx.stroke();
+</script>
+</body>
+</html>
